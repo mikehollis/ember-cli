@@ -9,9 +9,11 @@ var tmp               = require('./tmp');
 var conf              = require('./conf');
 var copy              = Promise.denodeify(require('ember-cli-ncp'));
 var root              = process.cwd();
+var glob              = require('glob');
 
 var onOutput = {
-  onOutput: function() {
+  onOutput: function(a) {
+    console.log(a)
     return; // no output for initial application build
   }
 };
@@ -40,6 +42,8 @@ function mvRm(from, to) {
   var dir = path.join(root, to);
   from = path.resolve(from);
 
+  console.log('from', from, 'to', to);
+
   if (!fs.existsSync(dir)) {
     fs.mkdirsSync(dir);
     fs.copySync(from, to);
@@ -59,6 +63,7 @@ function applyCommand(command, name /*, ...flags*/) {
     args.splice(2, 0, flag);
   });
 
+  console.log(args);
   return runCommand.apply(undefined, args);
 }
 
@@ -86,20 +91,24 @@ function createTestTargets(projectName, options) {
 
   // Fresh install
   if (!downloaded('node_modules') && !downloaded('bower_components')) {
+    console.log('fresh install');
     command = function() {
       return applyCommand(options.command, projectName);
     };
     // bower_components but no node_modules
   } else if (!downloaded('node_modules') && downloaded('bower_components')) {
+    console.log('download node_modules, dont download bower_components');
     command = function() {
       return applyCommand(options.command, projectName, '--skip-bower');
     };
     // node_modules but no bower_components
   } else if (!downloaded('bower_components') && downloaded('node_modules')) {
+    console.log('download bower_components , dont download node_modules');
     command = function() {
       return applyCommand(options.command, projectName, '--skip-npm');
     };
   } else {
+    console.log('DONT download bower_components , dont download node_modules');
     // Everything is already there
     command = function() {
       return applyCommand(options.command, projectName, '--skip-npm', '--skip-bower');
@@ -107,7 +116,9 @@ function createTestTargets(projectName, options) {
   }
 
   return createTmp(function() {
-    return command();
+    return command().finally(function() {
+      return delay(5000);
+    })
   }).catch(handleResult).finally(function () {
   });
 }
@@ -136,6 +147,11 @@ function linkDependencies(projectName) {
   }).then(function() {
     var nodeModulesPath = targetPath + '/node_modules/';
     var bowerComponentsPath = targetPath + '/bower_components/';
+
+    console.log(process.cwd());
+    console.log(glob.sync('*'));
+    console.log(glob.sync('tmp/*'));
+    console.log(glob.sync('tmp/express-server-restart-test-app/*'));
 
     mvRm(nodeModulesPath, '.node_modules-tmp');
     mvRm(bowerComponentsPath, '.bower_components-tmp');
